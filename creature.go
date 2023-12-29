@@ -39,6 +39,7 @@ type Creature struct {
 	Vx              int
 	Vy              int
 	LastVisibleTurn int
+	Dead            bool
 }
 
 // NewCreature returns a new Creature with the given ID, color and type.
@@ -91,5 +92,27 @@ func (creature *Creature) Move(state *GameState) {
 
 // String returns a string representation of the Creature with field names.
 func (creature *Creature) String() string {
-	return fmt.Sprintf("Creature{Id: %d, Color: %d, Type: %d, X: %d, Y: %d, Vx: %d, Vy: %d, LastVisibleTurn: %d}", creature.Id, creature.Color, creature.Type, creature.X, creature.Y, creature.Vx, creature.Vy, creature.LastVisibleTurn)
+	return fmt.Sprintf("Creature{Id: %d, Color: %d, Type: %d, X: %d, Y: %d, Vx: %d, Vy: %d, LastVisibleTurn: %d, Dead: %t}", creature.Id, creature.Color, creature.Type, creature.X, creature.Y, creature.Vx, creature.Vy, creature.LastVisibleTurn, creature.Dead)
+}
+
+// Check if creature is scanned by any of the drones
+func (creature *Creature) IsScanned(state *GameState) bool {
+	for _, drone := range state.MyDrones {
+		for _, scan := range drone.Scans {
+			if scan.Id == creature.Id {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// Check if creature has been delivered by any of drones
+func (creature *Creature) IsDelivered(state *GameState) bool {
+	for _, scan := range state.MyScans {
+		if scan.Id == creature.Id {
+			return true
+		}
+	}
+	return false
 }

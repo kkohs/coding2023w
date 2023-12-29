@@ -19,6 +19,9 @@ func init() {
 // MoveAll creatures based on their type and current position vx,vy and nearby creatures and drones, only perform move if creature is visible or within max turns visible
 func (state *GameState) MoveAll() {
 	for _, creature := range state.Creatures {
+		if creature.Dead {
+			continue
+		}
 		if creature.LastVisibleTurn != NotInitialized || creature.LastVisibleTurn+MaxTurnsVisible > state.Turn {
 			creature.Move(state)
 		}
@@ -76,7 +79,7 @@ func moveAway(fish *Creature, fromX, fromY int) *Creature {
 
 // Estimate position of creature based on drone blips, creature type and nearby creatures.
 func (state *GameState) Estimate(creature *Creature) {
-	if creature == nil || creature.LastVisibleTurn != NotInitialized || creature.LastVisibleTurn+MaxTurnsVisible > state.Turn {
+	if creature == nil || creature.Dead || creature.LastVisibleTurn != NotInitialized || (creature.LastVisibleTurn > NotInitialized && creature.LastVisibleTurn+MaxTurnsVisible > state.Turn) {
 		return
 	}
 
@@ -130,6 +133,9 @@ func (state *GameState) Estimate(creature *Creature) {
 
 	// Check for collision with other fishes and adjust velocity
 	for _, otherFish := range state.Creatures {
+		if otherFish.Dead {
+			continue
+		}
 		if otherFish.Id != creature.Id && distance(newX, newY, otherFish.X, otherFish.Y) < 600 {
 			creature.Vx = -creature.Vx // Reverse X velocity
 			creature.Vy = -creature.Vy // Reverse Y velocity

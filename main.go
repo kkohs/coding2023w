@@ -19,7 +19,7 @@ func main() {
 		state.AddCreature(NewCreature(creatureId, color, CreatureType(_type)))
 	}
 	for {
-		state.NextTurn()
+		state.PrepareForNextTurn()
 		var myScore int
 		fmt.Scan(&myScore)
 		state.MyScore = myScore
@@ -86,20 +86,19 @@ func main() {
 			var droneId, creatureId int
 			var radar string
 			fmt.Scan(&droneId, &creatureId, &radar)
-			Log("Radar blip", droneId, creatureId, radar)
 			state.UpdateRadarBlip(droneId, creatureId, radar)
 		}
-
+		state.NextTurn()
 		state.MoveAll()
 		state.EstimateAll()
 
 		state.Print()
 
 		for i := 0; i < myDroneCount; i++ {
-			Log("Debug messages...")
-
-			// fmt.Fprintln(os.Stderr, "Debug messages...")
-			fmt.Println("WAIT 1") // MOVE <x> <y> <light (1|0)> | WAIT <light (1|0)>
+			drone := state.GetDrone(i)
+			if drone != nil {
+				drone.Move(state)
+			}
 		}
 	}
 }

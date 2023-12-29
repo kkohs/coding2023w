@@ -148,8 +148,20 @@ func (state *GameState) GetCreature(id int) *Creature {
 	return nil
 }
 
+// GetMonsters get only monster type creatures
+func (state *GameState) GetMonsters() []*Creature {
+	monsters := []*Creature{}
+	for _, creature := range state.Creatures {
+		if creature.Type == Monster {
+			monsters = append(monsters, creature)
+		}
+	}
+	return monsters
+}
+
 // Print all state information each in new line
 func (state *GameState) Print() {
+	Log("Turn:", state.Turn)
 	for _, creature := range state.Creatures {
 		Log(creature.String())
 	}
@@ -162,12 +174,33 @@ func (state *GameState) Print() {
 // NextTurn increments the turn counter
 func (state *GameState) NextTurn() {
 	state.Turn++
+	// Mark all creatures dead if no drones have radar blips for them
+	for _, creature := range state.Creatures {
+		creature.Dead = true
+		for _, drone := range state.MyDrones {
+			if _, ok := drone.RadarBlips[creature.Id]; ok {
+				creature.Dead = false
+				break
+			}
+		}
+		for _, drone := range state.FoeDrones {
+			if _, ok := drone.RadarBlips[creature.Id]; ok {
+				creature.Dead = false
+				break
+			}
+		}
+	}
 
+}
+
+// PrepareForNextTurn clears the GameState's MyDrones and FoeDrones slices.
+func (state *GameState) PrepareForNextTurn() {
 	// Clear scans
 	state.MyScans = []*Creature{}
 	state.FoeScans = []*Creature{}
 	// Clear radar blips
 	for _, drone := range state.MyDrones {
 		drone.ClearRadarBlips()
+		drone.ClearScans()
 	}
 }

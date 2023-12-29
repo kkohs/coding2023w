@@ -10,6 +10,7 @@ type Drone struct {
 	Battery    int
 	Scans      []*Creature
 	RadarBlips map[int]RadarBlip
+	Target     *Creature
 }
 
 type RadarBlip string

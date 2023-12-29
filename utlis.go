@@ -8,7 +8,7 @@ import (
 
 // Log log message to stderr
 func Log(messages ...any) {
-	fmt.Fprintln(os.Stderr, messages)
+	_, _ = fmt.Fprintln(os.Stderr, messages...)
 }
 
 // Calculate distance between to grid points, return as int
