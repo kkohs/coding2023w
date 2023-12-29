@@ -162,12 +162,35 @@ func (state *GameState) GetMonsters() []*Creature {
 // Print all state information each in new line
 func (state *GameState) Print() {
 	Log("Turn:", state.Turn)
+	Log("My score:", state.MyScore)
+	Log("Foe score:", state.FoeScore)
+
+	// print creatures skipping monsters
+	Log("Creatures:")
 	for _, creature := range state.Creatures {
+
+		if creature.Type == Monster {
+			continue
+		}
 		Log(creature.String())
 	}
 
+	Log("My drones:")
+
 	for _, drone := range state.MyDrones {
 		Log(drone.String())
+	}
+	// prin all monsters
+	Log("Monsters:")
+	for _, monster := range state.GetMonsters() {
+		Log(monster.String())
+	}
+
+	// print distances from drones to monsters
+	for _, drone := range state.MyDrones {
+		for _, creature := range state.GetMonsters() {
+			Log("Distance from drone", drone.Id, "to monster", creature.Id, "is", distance(drone.X, drone.Y, creature.X, creature.Y))
+		}
 	}
 }
 

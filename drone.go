@@ -3,14 +3,17 @@ package main
 import "fmt"
 
 type Drone struct {
-	Id         int
-	X          int
-	Y          int
-	Emergency  int
-	Battery    int
-	Scans      []*Creature
-	RadarBlips map[int]RadarBlip
-	Target     *Creature
+	Id                   int
+	X                    int
+	Y                    int
+	PrevTargetDirectionX int
+	PrevTargetDirectionY int
+	Emergency            int
+	Battery              int
+	Scans                []*Creature
+	RadarBlips           map[int]RadarBlip
+	Target               *Creature
+	LastLightTurn        int
 }
 
 type RadarBlip string

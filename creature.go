@@ -24,6 +24,7 @@ const (
 
 var (
 	fishDepthsByType = map[CreatureType][2]int{
+		Monster:     {5000, 10000},
 		ShallowFish: {ShallowFishMinDepth, ShallowFishMaxDepth},
 		MediumFish:  {MediumFishMinDepth, MediumFishMaxDepth},
 		DeepFish:    {DeepFishMinDepth, DeepFishMaxDepth},
@@ -111,6 +112,19 @@ func (creature *Creature) IsScanned(state *GameState) bool {
 func (creature *Creature) IsDelivered(state *GameState) bool {
 	for _, scan := range state.MyScans {
 		if scan.Id == creature.Id {
+			return true
+		}
+	}
+	return false
+}
+
+// IsTargeted returns true if the creature is targeted by any of the drones, ignores drone thats been passed if not nil
+func (creature *Creature) IsTargeted(state *GameState, skipDrone *Drone) bool {
+	for _, drone := range state.MyDrones {
+		if skipDrone != nil && drone.Id == skipDrone.Id {
+			continue
+		}
+		if drone.Target != nil && drone.Target.Id == creature.Id {
 			return true
 		}
 	}

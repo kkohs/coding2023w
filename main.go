@@ -89,16 +89,17 @@ func main() {
 			state.UpdateRadarBlip(droneId, creatureId, radar)
 		}
 		state.NextTurn()
-		state.MoveAll()
 		state.EstimateAll()
 
 		state.Print()
-
 		for i := 0; i < myDroneCount; i++ {
 			drone := state.GetDrone(i)
 			if drone != nil {
 				drone.Move(state)
 			}
 		}
+
+		state.MoveAll()
+
 	}
 }
