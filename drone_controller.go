@@ -18,12 +18,7 @@ func (drone *Drone) Move(state *GameState) {
 	points := state.CalculatePotentialPoints()
 	Log("Points", points)
 	if points > 63 {
-		x, y := drone.X, 500
-		if drone.IsMonstersNearby(state) {
-			x, y = drone.CalculateEscapePath(state)
-		}
-		command := fmt.Sprintf("MOVE %d %d %d ASCENDIIING! TOSCOOOORE", x, y, drone.GetLightPower(state))
-		fmt.Println(command)
+		drone.Ascend(state)
 		return
 	}
 
@@ -38,144 +33,140 @@ func (drone *Drone) Move(state *GameState) {
 
 	// If no target found, ascend to surface
 	if drone.Target == nil {
-		x, y := drone.X, 500
-		if drone.IsMonstersNearby(state) {
-			x, y = drone.CalculateEscapePath(state)
-		}
-		command := fmt.Sprintf("MOVE %d %d %d ASCENDIIING!", x, y, drone.GetLightPower(state))
-		fmt.Println(command)
+		drone.Ascend(state)
 		return
 	}
 
-	if drone.IsMonstersNearby(state) {
-		// Calculate escape path
-		x, y := drone.CalculateEscapePath(state)
-		command := fmt.Sprintf("MOVE %d %d %d ESCAPE!", x, y, drone.GetLightPower(state))
-		fmt.Println(command)
-		return
-	}
+	drone.MoveToTarget(state)
+}
 
-	// Light
-	lightPower := drone.GetLightPower(state)
-	lightMessage := ""
-	if lightPower == 1 {
-		lightMessage = "LIGHT"
-	}
+// Ascend function for drone to ascend to surface
+func (drone *Drone) Ascend(state *GameState) {
+	command := fmt.Sprintf("MOVE %d %d %d ASCENDIIING!", drone.X, 500, drone.GetLightPower(state))
+	fmt.Println(command)
+}
+
+// Wait function for drone to wait
+func (drone *Drone) Wait(state *GameState) {
+	command := fmt.Sprintf("WAIT %d", drone.GetLightPower(state))
+	fmt.Println(command)
+}
+
+// MoveTo function for drone to move to x,y
+func (drone *Drone) MoveTo(state *GameState, x, y int) {
+	message := "Suurface"
 	if drone.Target != nil {
-		// Move to target
-		x, y := drone.GetNextPoint(state)
-		drone.PrevTargetDirectionX = x
-		drone.PrevTargetDirectionY = y
-		command := fmt.Sprintf("MOVE %d %d %d TARGETING %d %s", x, y, lightPower, drone.Target.Id, lightMessage)
-		fmt.Println(command)
-	} else {
-		// Wait for target
-		command := fmt.Sprintf("WAIT %d NO_TARGET %s", lightPower, lightMessage)
-		fmt.Println(command)
+		message = fmt.Sprintf("Target: %d", drone.Target.Id)
 	}
+	command := fmt.Sprintf("MOVE %d %d %d Targeting!! %s", x, y, drone.GetLightPower(state), message)
+	fmt.Println(command)
 }
 
-func (drone *Drone) MoveTowardsTarget(state *GameState) {
+// MoveToTarget moves drone to target
+func (drone *Drone) MoveToTarget(state *GameState) {
 	if drone.Target == nil {
-		drone.MoveTowardsSurface()
+		drone.Wait(state)
 		return
 	}
 
-	nearbyMonsters := drone.GetNearbyMonsters(state, 1000)
-	targetX, targetY := drone.Target.X, drone.Target.Y
-	safePathFound := false
+	monsterInPath := drone.GetMonstersInPath(state, drone.Target.X, drone.Target.Y)
+	targetX, targetY := drone.GetNextPositionTowardsTarget(drone.Target.X, drone.Target.Y)
+	if len(monsterInPath) > 0 {
+		Log("Monster in path", monsterInPath)
+		targetX, targetY = drone.CalculateBestPathToAvoidMonsters(state, targetX, targetY)
+	}
 
-	for angle := 0; angle < 360; angle += 10 {
-		pathCrossesMonster := false
-		for _, monster := range nearbyMonsters {
-			if pathIntersectsMonster(drone.X, drone.Y, targetX, targetY, monster) {
-				pathCrossesMonster = true
-				break
+	drone.MoveTo(state, targetX, targetY)
+
+}
+
+func (drone *Drone) GetNextPositionTowardsTarget(targetX, targetY int) (int, int) {
+	// Calculate the difference in x and y coordinates between the drone and the target
+	diffX := targetX - drone.X
+	diffY := targetY - drone.Y
+
+	// Calculate the distance to the target
+	distanceToTarget := math.Sqrt(float64(diffX*diffX + diffY*diffY))
+
+	// If the distance is less than or equal to the drone's movement, the drone can reach the target in one move
+	if distanceToTarget <= DroneMovement {
+		return targetX, targetY
+	}
+
+	// Normalize the difference vector
+	normX, normY := float64(diffX)/distanceToTarget, float64(diffY)/distanceToTarget
+
+	// Scale the normalized vector to the drone's movement distance
+	nextX := drone.X + int(normX*DroneMovement)
+	nextY := drone.Y + int(normY*DroneMovement)
+
+	return nextX, nextY
+}
+
+func (drone *Drone) CalculateBestPathToAvoidMonsters(state *GameState, targetX, targetY int) (int, int) {
+	// Define angles to check for alternative paths
+	angles := []int{-90, -45, 0, 45, 90}
+	bestX, bestY := drone.X, drone.Y
+	maxDistanceFromMonsters := 0
+
+	for _, angle := range angles {
+		// Calculate new direction with the given angle
+		newVx, newVy := rotateVectorTowards(targetX-drone.X, targetY-drone.Y, angle)
+		newX, newY := drone.X+newVx, drone.Y+newVy
+
+		// Ensure the drone stays within bounds
+		newX = clamp(newX, 0, 10000)
+		newY = clamp(newY, 0, 10000)
+
+		// Calculate the minimum distance to any monster from this new position
+		minDist := drone.MinDistanceToAnyMonster(state, newX, newY)
+
+		// Choose the direction that maximizes the distance to the nearest monster
+		if minDist > maxDistanceFromMonsters {
+			bestX, bestY = newX, newY
+			maxDistanceFromMonsters = minDist
+		}
+	}
+
+	return bestX, bestY
+}
+
+func (drone *Drone) GetMonstersInPath(state *GameState, targetX, targetY int) []*Creature {
+	var monstersInPath []*Creature
+	monsters := state.GetMonsters()
+
+	// Calculate path increments
+	diffX := float64(targetX - drone.X)
+	diffY := float64(targetY - drone.Y)
+	distanceToTarget := math.Sqrt(diffX*diffX + diffY*diffY)
+	steps := int(distanceToTarget / DroneMovement)
+	if steps == 0 {
+		steps = 1
+	}
+
+	// Check each step along the path
+	for i := 0; i <= steps; i++ {
+		pointX := drone.X + int(float64(i)*diffX/float64(steps))
+		pointY := drone.Y + int(float64(i)*diffY/float64(steps))
+
+		for _, monster := range monsters {
+			if distance(pointX, pointY, monster.X, monster.Y) <= 600 {
+				monstersInPath = appendUniqueMonster(monstersInPath, monster)
 			}
 		}
-
-		if !pathCrossesMonster {
-			safePathFound = true
-			break
-		}
-
-		// Rotate the path
-		rotatedVx, rotatedVy := rotateVector(targetX-drone.X, targetY-drone.Y, angle)
-		targetX, targetY = drone.X+rotatedVx, drone.Y+rotatedVy
 	}
 
-	if safePathFound {
-		drone.MoveTo(targetX, targetY)
-	} else {
-		drone.MoveTowardsSurface()
-	}
+	return monstersInPath
 }
 
-func (drone *Drone) MoveTowardsSurface() {
-	// Move towards the surface at the current x-coordinate
-	fmt.Println(fmt.Sprintf("MOVE %d %d", drone.X, 500))
-}
-
-func (drone *Drone) MoveTo(x, y int) {
-	fmt.Println(fmt.Sprintf("MOVE %d %d", x, y))
-}
-func (drone *Drone) CalculateEscapePath(state *GameState) (int, int) {
-	nearestMonster, nearestDistance := drone.FindNearestMonster(state, MonsterMinDistance)
-	if nearestMonster == nil {
-		return drone.X, drone.Y
-	}
-
-	// Convert coordinates to float64 for precision
-	escapeVx := float64(drone.X - nearestMonster.X)
-	escapeVy := float64(drone.Y - nearestMonster.Y)
-
-	// Normalize the escape vector
-	normalizedVx, normalizedVy := normalizeVector(int(escapeVx), int(escapeVy))
-
-	// Scale the normalized vector to the drone's movement range
-	scaledVx := normalizedVx * float64(DroneMovement)
-	scaledVy := normalizedVy * float64(DroneMovement)
-
-	// Calculate the potential escape position
-	newX := float64(drone.X) + scaledVx
-	newY := float64(drone.Y) + scaledVy
-
-	// If the nearest monster is more than 1000 units away, consider rotating the escape direction
-	if nearestDistance > 1000 {
-		angle := 90
-		if drone.ShouldRotateLeft(state, nearestMonster) {
-			angle = -90
-		}
-
-		// Rotate the escape vector
-		rotatedVx, rotatedVy := rotateVector(int(scaledVx), int(scaledVy), angle)
-
-		// Adjust the position with the rotated vector
-		newX, newY = float64(drone.X)+float64(rotatedVx), float64(drone.Y)+float64(rotatedVy)
-
-		// Check if the new position is safe from other monsters
-		for _, otherMonster := range state.GetMonsters() {
-			if otherMonster.Id != nearestMonster.Id && distance(int(newX), int(newY), otherMonster.X, otherMonster.Y) < MonsterMinDistance {
-				newX, newY = float64(drone.X)+scaledVx, float64(drone.Y)+scaledVy
-				break
-			}
+// Helper function to add unique monsters to the slice
+func appendUniqueMonster(monsters []*Creature, monster *Creature) []*Creature {
+	for _, m := range monsters {
+		if m.Id == monster.Id {
+			return monsters
 		}
 	}
-
-	// Convert the final coordinates back to int, ensuring they are within bounds
-	return clamp(int(newX), 0, 10000), clamp(int(newY), 0, 10000)
-}
-
-func (drone *Drone) ShouldRotateLeft(state *GameState, nearestMonster *Creature) bool {
-	// Temporarily rotate both ways and check which direction is safer
-	leftVx, leftVy := rotateVector(drone.X-nearestMonster.X, drone.Y-nearestMonster.Y, 90)
-	rightVx, rightVy := rotateVector(drone.X-nearestMonster.X, drone.Y-nearestMonster.Y, -90)
-
-	leftDistance := drone.MinDistanceToAnyMonster(state, drone.X+leftVx, drone.Y+leftVy)
-	rightDistance := drone.MinDistanceToAnyMonster(state, drone.X+rightVx, drone.Y+rightVy)
-
-	// Rotate left if it results in a larger minimum distance to any monster, else rotate right
-	return leftDistance > rightDistance
+	return append(monsters, monster)
 }
 
 func (drone *Drone) MinDistanceToAnyMonster(state *GameState, x, y int) int {
